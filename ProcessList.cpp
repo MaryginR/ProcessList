@@ -2,7 +2,7 @@
 
 std::unordered_set<std::string> GlobalProcessList;
 
-static void GetAllProcessNames()
+static void GetAllProcessNamesByHandle()
 {
     DWORD processes[1024]{}, cbNeeded = 0, cProcesses;
 
@@ -31,4 +31,40 @@ static void GetAllProcessNames()
             }
         }
     }
+}
+
+static void GetAllProcessNamesByToolhelp32Snapshot()
+{
+    // Создаем снимок всех процессов в системе
+    HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hSnapshot == INVALID_HANDLE_VALUE)
+    {
+        throw "Failed to create snapshot of processes";
+    }
+
+    PROCESSENTRY32 pe32;
+    pe32.dwSize = sizeof(PROCESSENTRY32);
+
+    // Проходим по списку процессов
+    if (Process32First(hSnapshot, &pe32))
+    {
+        do
+        {
+#ifdef UNICODE
+            std::wstring wstr(pe32.szExeFile);
+            std::string str(wstr.begin(), wstr.end());
+            GlobalProcessList.insert(str);
+#else
+            GlobalProcessList.insert(pe32.szExeFile);
+#endif
+        } while (Process32Next(hSnapshot, &pe32));
+    }
+    else
+    {
+        // Ошибка при получении первого процесса
+        CloseHandle(hSnapshot);
+        throw "Failed to iterate through processes";
+    }
+
+    CloseHandle(hSnapshot);
 }
